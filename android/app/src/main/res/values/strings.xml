@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Hot Update Demo</string>
+    <string name="title">Game Module Hot Update Demo</string>
+    <string name="catalog_url">Catalog: %1$s</string>
+    <string name="update_idle">Update status: not checked</string>
+    <string name="update_checking">Update status: checking…</string>
+    <string name="update_downloading">Update status: downloading %1$d / %2$d KB</string>
+    <string name="update_installed">Update status: new version installed, applies next time the game opens</string>
+    <string name="update_up_to_date">Update status: already up to date</string>
+    <string name="update_failed">Update failed (code %1$d): %2$s</string>
+    <string name="check_update">Check for update</string>
+    <string name="open_game">Open game as guest</string>
+    <string name="apply_hint">Opening the game uses the latest installed version and checks for a newer one in the background. A downloaded version applies the next time the game opens.</string>
+    <string name="invalid_session">Invalid guest session parameters</string>
+    <string name="session_invalid">Session invalid: %1$s</string>
+</resources>
