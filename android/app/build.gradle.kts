@@ -36,7 +36,8 @@ android {
 dependencies {
     // 热更新模块按 SDK 版本精确匹配，升级 SDK 后需要发布对应版本的模块。
     val gameSdkVersion = providers.gradleProperty("gameSdkVersion")
-        .orElse("0.2.5")
+        .orElse("0.3.0")
         .get()
-    implementation("com.eath.cocosgamesdk:game-sdk:$gameSdkVersion")
+    // 热更新库会自动带上同版本的 game-sdk。
+    implementation("com.eath.cocosgamesdk:game-sdk-hotupdate:$gameSdkVersion")
 }

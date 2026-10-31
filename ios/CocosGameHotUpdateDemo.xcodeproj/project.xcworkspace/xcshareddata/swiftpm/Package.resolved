@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/eathwinster-jk/cocos-game-ios-sdk",
       "state" : {
-        "revision" : "5e9497b0fde1fb5a50fb6d6b5430ca3ecc7bf6ae",
-        "version" : "0.2.5"
+        "revision" : "fbf24c5ed709ce665dc0681a0a69ffe9186aec04",
+        "version" : "0.3.0"
       }
     }
   ],

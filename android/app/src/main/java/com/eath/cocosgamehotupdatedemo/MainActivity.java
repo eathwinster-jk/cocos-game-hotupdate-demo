@@ -14,21 +14,18 @@ import android.widget.Toast;
 
 import com.eath.cocosgamesdk.CocosGameActivity;
 import com.eath.cocosgamesdk.CocosGameSDK;
-import com.eath.cocosgamesdk.GameSDKConfig;
 import com.eath.cocosgamesdk.GameSessionConfig;
-import com.eath.cocosgamesdk.GameUpdateListener;
+import com.eath.cocosgamesdk.hotupdate.GameHotUpdate;
+import com.eath.cocosgamesdk.hotupdate.GameUpdateListener;
 
 public final class MainActivity extends Activity {
     private static final String LOG_TAG = "HotUpdateDemo";
     private static final String GAME_ID = "niuniu";
-    private static final String STATE_CHECKING = "checking";
-    private static final String STATE_DOWNLOADING = "downloading";
-    private static final String STATE_INSTALLED = "installed";
-    private static final String STATE_UP_TO_DATE = "upToDate";
     private static final int BYTES_PER_KILOBYTE = 1024;
+    private GameHotUpdate hotUpdate;
     private TextView statusView;
 
-    /** SDK 已把回调切回主线程，可以直接刷新界面。 */
+    /** 热更新库已把回调切回主线程，可以直接刷新界面。 */
     private final GameUpdateListener updateListener = new GameUpdateListener() {
         @Override
         public void onUpdateProgress(String gameId, String state, long receivedBytes, long totalBytes) {
@@ -43,13 +40,13 @@ public final class MainActivity extends Activity {
         }
     };
 
-    /** 用 Demo 专用清单初始化 SDK 并创建页面。 */
+    /** 初始化 SDK，用 Demo 专用清单开启热更新（须在打开游戏前），并创建页面。 */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        CocosGameSDK sdk = CocosGameSDK.getInstance();
-        sdk.initialize(this, new GameSDKConfig(BuildConfig.MODULE_CATALOG_URL));
-        sdk.setUpdateListener(updateListener);
+        CocosGameSDK.getInstance().initialize(this);
+        hotUpdate = GameHotUpdate.install(this, BuildConfig.MODULE_CATALOG_URL);
+        hotUpdate.setUpdateListener(updateListener);
         setContentView(createContentView());
     }
 
@@ -62,8 +59,7 @@ public final class MainActivity extends Activity {
         root.addView(createText(getString(R.string.catalog_url, BuildConfig.MODULE_CATALOG_URL), 13), createItemParams());
         statusView = createText(getString(R.string.update_idle), 16);
         root.addView(statusView, createItemParams());
-        root.addView(createButton(R.string.check_update, () -> CocosGameSDK.getInstance().checkGameUpdate(GAME_ID)),
-            createItemParams());
+        root.addView(createButton(R.string.check_update, () -> hotUpdate.checkForUpdate(GAME_ID)), createItemParams());
         root.addView(createButton(R.string.open_game, this::openGuestGame), createItemParams());
         root.addView(createText(getString(R.string.apply_hint), 13), createItemParams());
         return root;
@@ -71,12 +67,12 @@ public final class MainActivity extends Activity {
 
     /** 把更新状态转换为页面文案。 */
     private String createProgressText(String state, long receivedBytes, long totalBytes) {
-        if (STATE_CHECKING.equals(state)) return getString(R.string.update_checking);
-        if (STATE_DOWNLOADING.equals(state)) {
+        if (GameHotUpdate.STATE_CHECKING.equals(state)) return getString(R.string.update_checking);
+        if (GameHotUpdate.STATE_DOWNLOADING.equals(state)) {
             return getString(R.string.update_downloading, receivedBytes / BYTES_PER_KILOBYTE, totalBytes / BYTES_PER_KILOBYTE);
         }
-        if (STATE_INSTALLED.equals(state)) return getString(R.string.update_installed);
-        if (STATE_UP_TO_DATE.equals(state)) return getString(R.string.update_up_to_date);
+        if (GameHotUpdate.STATE_INSTALLED.equals(state)) return getString(R.string.update_installed);
+        if (GameHotUpdate.STATE_UP_TO_DATE.equals(state)) return getString(R.string.update_up_to_date);
         return state;
     }
 
@@ -112,7 +108,7 @@ public final class MainActivity extends Activity {
     /** 页面销毁时注销更新监听，避免持有已销毁的页面。 */
     @Override
     protected void onDestroy() {
-        CocosGameSDK.getInstance().setUpdateListener(null);
+        hotUpdate.setUpdateListener(null);
         super.onDestroy();
     }
 

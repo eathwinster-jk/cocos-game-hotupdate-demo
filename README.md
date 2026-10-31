@@ -17,29 +17,44 @@
 
 适用平台：Android、iOS。H5 SDK 每次都从网页加载最新资源，不需要热更新。
 
-## 2. 版本要求
+## 2. 依赖
 
-| 平台 | 最低 SDK 版本 |
+从 0.3.0 起，热更新是独立的库，与游戏 SDK 同版本发布，宿主按需引入。不引入热更新库时，SDK 始终使用内置模块。
+
+| 平台 | 热更新库 |
 | --- | --- |
-| Android | `com.eath.cocosgamesdk:game-sdk:0.2.5` |
-| iOS | `cocos-game-ios-sdk` 0.2.5 |
+| Android | `com.eath.cocosgamesdk:game-sdk-hotupdate:0.3.0`（自动带上同版本 `game-sdk`） |
+| iOS SPM | `https://github.com/eathwinster-jk/cocos-game-ios-sdk` 0.3.0，勾选 `CocosGameHotUpdate` 产品（已包含 `CocosGameSDK`） |
+| iOS CocoaPods | `pod 'CocosGameHotUpdate', :podspec => 'https://raw.githubusercontent.com/eathwinster-jk/cocos-game-ios-sdk/0.3.0/CocosGameHotUpdate.podspec'`，同时保留 `CocosGameSDK` 的 pod |
+
+热更新库与游戏 SDK 的版本必须一致。
 
 游戏模块依赖 SDK 内置的主包脚本，**只适用于构建它的那个 SDK 版本**。宿主升级 SDK 后，SDK 只会安装为新 SDK 版本发布的模块；在游戏方发布之前，使用新 SDK 内置的模块。
 
+### 从 0.2.5 升级
+
+| 平台 | 0.2.5 | 0.3.0 |
+| --- | --- | --- |
+| Android | `initialize(context, new GameSDKConfig(url))` | `initialize(context)` + `GameHotUpdate.install(context, url)` |
+| Android | `CocosGameSDK.setUpdateListener` / `checkGameUpdate` | `GameHotUpdate.setUpdateListener` / `checkForUpdate` |
+| iOS | `configure:[[CocosGameSDKConfig alloc] initWithCatalogURL:url]` | `[CocosGameHotUpdate installWithCatalogURL:url]` |
+| iOS | `CocosGameSDKDelegate` 的 `gameSDKDidUpdateGame…` / `gameSDKDidFailUpdateGame…` | `CocosGameHotUpdateDelegate` 的 `gameHotUpdateDidUpdateGame…` / `gameHotUpdateDidFailUpdateGame…` |
+| iOS | `checkGameUpdate:` | `checkForUpdateWithGameId:` |
+
 ## 3. 宿主接入
 
-只需要在初始化 SDK 时传入版本清单地址。不传就不开启热更新，行为与 0.2.4 及以前一致。
+初始化 SDK 后、打开游戏前，用版本清单地址开启热更新即可。
 
 版本清单地址由游戏方提供，必须是 HTTPS，并且 Android、iOS 各用一份。
 
 ### 3.1 Android
 
 ```java
-CocosGameSDK sdk = CocosGameSDK.getInstance();
-sdk.initialize(context, new GameSDKConfig("https://<清单域名>/android/catalog.json"));
+CocosGameSDK.getInstance().initialize(context);
+GameHotUpdate hotUpdate = GameHotUpdate.install(context, "https://<清单域名>/android/catalog.json");
 
 // 可选：监听更新进度，回调在主线程
-sdk.setUpdateListener(new GameUpdateListener() {
+hotUpdate.setUpdateListener(new GameUpdateListener() {
     @Override
     public void onUpdateProgress(String gameId, String state, long receivedBytes, long totalBytes) {
         Log.i("Host", "更新进度 " + gameId + " " + state + " " + receivedBytes + "/" + totalBytes);
@@ -52,36 +67,42 @@ sdk.setUpdateListener(new GameUpdateListener() {
 });
 
 // 可选：在打开游戏之前预先下载，例如进入直播间时
-sdk.checkGameUpdate("niuniu");
+hotUpdate.checkForUpdate("niuniu");
 ```
 
-页面销毁时调用 `setUpdateListener(null)`，避免监听器持有已销毁的页面。
+页面销毁时调用 `setUpdateListener(null)`，避免监听器持有已销毁的页面。状态和错误码常量见 `GameHotUpdate.STATE_*`、`GameHotUpdate.ERROR_*`。
 
 ### 3.2 iOS
 
 ```objc
+#import <CocosGameHotUpdate/CocosGameHotUpdate.h>
+
 [[CocosGameSDK shared] initializeWithWindow:self.window launchOptions:launchOptions];
 NSURL *catalogURL = [NSURL URLWithString:@"https://<清单域名>/ios/catalog.json"];
-[[CocosGameSDK shared] configure:[[CocosGameSDKConfig alloc] initWithCatalogURL:catalogURL]];
+// 宿主需要持有返回的对象，作为 delegate 的生命周期依据
+self.hotUpdate = [CocosGameHotUpdate installWithCatalogURL:catalogURL];
+self.hotUpdate.delegate = self;
 
 // 可选：在打开游戏之前预先下载
-[[CocosGameSDK shared] checkGameUpdate:@"niuniu"];
+[self.hotUpdate checkForUpdateWithGameId:@"niuniu"];
 ```
 
-更新进度通过 `CocosGameSDKDelegate` 的可选方法回调，均在主线程：
+更新进度通过 `CocosGameHotUpdateDelegate` 的可选方法回调，均在主线程：
 
 ```objc
-- (void)gameSDKDidUpdateGame:(NSString *)gameId
-                       state:(NSString *)state
-               receivedBytes:(NSUInteger)receivedBytes
-                  totalBytes:(NSUInteger)totalBytes {
+- (void)gameHotUpdateDidUpdateGame:(NSString *)gameId
+                             state:(NSString *)state
+                     receivedBytes:(NSUInteger)receivedBytes
+                        totalBytes:(NSUInteger)totalBytes {
     NSLog(@"更新进度 %@ %@ %lu/%lu", gameId, state, (unsigned long)receivedBytes, (unsigned long)totalBytes);
 }
 
-- (void)gameSDKDidFailUpdateGame:(NSString *)gameId code:(NSInteger)code message:(NSString *)message {
+- (void)gameHotUpdateDidFailUpdateGame:(NSString *)gameId code:(NSInteger)code message:(NSString *)message {
     NSLog(@"更新失败 %@ code=%ld %@", gameId, (long)code, message);
 }
 ```
+
+状态常量见 `CocosGameHotUpdateState*`，错误码见 `CocosGameHotUpdateErrorCode`。
 
 ### 3.3 回调说明
 
@@ -107,7 +128,8 @@ NSURL *catalogURL = [NSURL URLWithString:@"https://<清单域名>/ios/catalog.js
 
 ### 3.4 宿主需要注意的事项
 
-- 打开游戏时 SDK 会自动检查更新，`checkGameUpdate` 只是提前下载，不调用也可以。
+- 开启热更新要在打开游戏之前；打开游戏时会自动检查更新，`checkForUpdate` 只是提前下载，不调用也可以。
+- 热更新只需开启一次，重复开启以最后一次为准。
 - 同一个游戏同时只会有一个下载任务，重复调用会被忽略。
 - 模块存放位置由 SDK 管理，宿主不要清理或修改：
   - Android：`Context.getFilesDir()/cocos_game_modules/`
@@ -137,9 +159,9 @@ NSURL *catalogURL = [NSURL URLWithString:@"https://<清单域名>/ios/catalog.js
   "modules": [
     {
       "gameId": "niuniu",
-      "sdkVersion": "0.2.5",
+      "sdkVersion": "0.3.0",
       "version": 3,
-      "url": "niuniu/0.2.5/3.zip",
+      "url": "niuniu/0.3.0/3.zip",
       "sha256": "17a2bbd6b8e41aec6b1e839db1d0825c2e553656667f412da6dd4d585aca28ff",
       "size": 1818830
     }
@@ -200,7 +222,7 @@ cd android
 ./gradlew :app:installDebug
 ```
 
-- SDK 版本默认 0.2.5，可用 `-PgameSdkVersion=x.y.z` 指定。
+- SDK 版本默认 0.3.0，可用 `-PgameSdkVersion=x.y.z` 指定（不低于 0.3.0）。
 - 版本清单地址在 `app/build.gradle.kts` 的 `MODULE_CATALOG_URL`。
 - 日志过滤：`adb logcat -s HotUpdateDemo GameModuleUpdater GameModuleStore`
 
@@ -208,7 +230,7 @@ cd android
 
 环境：Xcode 16 及以上，iOS 16 及以上。
 
-1. 打开 `ios/CocosGameHotUpdateDemo.xcodeproj`，Xcode 会通过 Swift Package Manager 拉取 `cocos-game-ios-sdk`。
+1. 打开 `ios/CocosGameHotUpdateDemo.xcodeproj`，Xcode 会通过 Swift Package Manager 拉取 `cocos-game-ios-sdk` 的 `CocosGameHotUpdate` 产品。
 2. 选择 `CocosGameHotUpdateDemo` scheme 运行。
 3. 版本清单地址在 `CocosGameHotUpdateDemo/DemoConfig.h` 的 `DemoModuleCatalogURL`。
 
@@ -224,7 +246,7 @@ cd android
 不能。当前打开的游戏已经加载了旧模块，新版本统一在下次打开游戏时生效。
 
 **Q：用户网络不好会不会打不开游戏？**
-不会。打开游戏只使用本机已有的模块，更新在后台进行，失败只回调 `onUpdateFailed` / `gameSDKDidFailUpdateGame`。
+不会。打开游戏只使用本机已有的模块，更新在后台进行，失败只回调 `onUpdateFailed` / `gameHotUpdateDidFailUpdateGame`。
 
 **Q：宿主升级 SDK 后，之前下载的模块会怎样？**
 旧 SDK 版本的模块不再使用，SDK 改用新版本内置模块，并等待游戏方为新 SDK 版本发布模块。

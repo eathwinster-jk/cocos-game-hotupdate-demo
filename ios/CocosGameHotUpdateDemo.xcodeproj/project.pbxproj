@@ -11,7 +11,7 @@
 		3E120CF436BA38691A0A0AA8 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F3F4489D816F462F33938E02 /* Foundation.framework */; };
 		548907438E0F50D3F019B0CB /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = B471D5B79B29A9E3C5590C6B /* main.m */; };
 		9F86522C730AE15D233E258B /* HotUpdateViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = DF8C772F952CF1EB78A13D2F /* HotUpdateViewController.m */; };
-		C2467FFFC5855F7D240BE77B /* CocosGameSDK in Frameworks */ = {isa = PBXBuildFile; productRef = A5E30792D4ADBF25C71D3E44 /* CocosGameSDK */; };
+		C2467FFFC5855F7D240BE77B /* CocosGameHotUpdate in Frameworks */ = {isa = PBXBuildFile; productRef = A5E30792D4ADBF25C71D3E44 /* CocosGameHotUpdate */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,7 +31,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3E120CF436BA38691A0A0AA8 /* Foundation.framework in Frameworks */,
-				C2467FFFC5855F7D240BE77B /* CocosGameSDK in Frameworks */,
+				C2467FFFC5855F7D240BE77B /* CocosGameHotUpdate in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -102,7 +102,7 @@
 			);
 			name = CocosGameHotUpdateDemo;
 			packageProductDependencies = (
-				A5E30792D4ADBF25C71D3E44 /* CocosGameSDK */,
+				A5E30792D4ADBF25C71D3E44 /* CocosGameHotUpdate */,
 			);
 			productName = CocosGameHotUpdateDemo;
 			productReference = 0F1EF035684444D05CBB7F17 /* CocosGameHotUpdateDemo.app */;
@@ -361,16 +361,16 @@
 			repositoryURL = "https://github.com/eathwinster-jk/cocos-game-ios-sdk";
 			requirement = {
 				kind = exactVersion;
-				version = 0.2.5;
+				version = 0.3.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		A5E30792D4ADBF25C71D3E44 /* CocosGameSDK */ = {
+		A5E30792D4ADBF25C71D3E44 /* CocosGameHotUpdate */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E22AC629A8838358E6F1A6AC /* XCRemoteSwiftPackageReference "cocos-game-ios-sdk" */;
-			productName = CocosGameSDK;
+			productName = CocosGameHotUpdate;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

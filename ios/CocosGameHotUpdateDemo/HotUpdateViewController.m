@@ -1,20 +1,17 @@
 // 热更新 Demo 主页面：检查更新、展示更新进度，并把游戏以游客身份内嵌在页面顶部。
 #import "HotUpdateViewController.h"
 
+#import <CocosGameHotUpdate/CocosGameHotUpdate.h>
 #import <CocosGameSDK/CocosGameSDK.h>
-#import <CocosGameSDK/CocosGameSessionConfig.h>
 
 #import "DemoConfig.h"
 
-static NSString *const DemoUpdateStateChecking = @"checking";
-static NSString *const DemoUpdateStateDownloading = @"downloading";
-static NSString *const DemoUpdateStateInstalled = @"installed";
-static NSString *const DemoUpdateStateUpToDate = @"upToDate";
 static const CGFloat DemoGameAspectRatio = 211.0 / 375.0;
 static const NSUInteger DemoBytesPerKilobyte = 1024;
 
-@interface HotUpdateViewController () <CocosGameSDKDelegate>
+@interface HotUpdateViewController () <CocosGameSDKDelegate, CocosGameHotUpdateDelegate>
 
+@property(nonatomic, strong) CocosGameHotUpdate *hotUpdate;
 @property(nonatomic, strong) UIView *gameContainer;
 @property(nonatomic, strong) UILabel *statusLabel;
 @property(nonatomic, strong) UILabel *messageLabel;
@@ -26,12 +23,14 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
 @implementation HotUpdateViewController
 
 /**
- * 创建页面并接收 SDK 回调（包括更新进度）。
+ * 创建页面，开启热更新（须在打开游戏前），并接收 SDK 与热更新回调。
  */
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
     CocosGameSDK.shared.delegate = self;
+    self.hotUpdate = [CocosGameHotUpdate installWithCatalogURL:[NSURL URLWithString:DemoModuleCatalogURL]];
+    self.hotUpdate.delegate = self;
     [self buildInterface];
     [self updateGameButtons:NO];
 }
@@ -131,7 +130,7 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
  * 预先检查并下载新版本，下次打开游戏生效。
  */
 - (void)checkUpdate {
-    [[CocosGameSDK shared] checkGameUpdate:DemoGameId];
+    [self.hotUpdate checkForUpdateWithGameId:DemoGameId];
 }
 
 /**
@@ -167,25 +166,25 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
  * 把更新状态转换为页面文案。
  */
 - (NSString *)createProgressText:(NSString *)state receivedBytes:(NSUInteger)receivedBytes totalBytes:(NSUInteger)totalBytes {
-    if ([state isEqualToString:DemoUpdateStateChecking]) return @"更新状态：检查中…";
-    if ([state isEqualToString:DemoUpdateStateDownloading]) {
+    if ([state isEqualToString:CocosGameHotUpdateStateChecking]) return @"更新状态：检查中…";
+    if ([state isEqualToString:CocosGameHotUpdateStateDownloading]) {
         return [NSString stringWithFormat:@"更新状态：下载中 %lu / %lu KB",
             (unsigned long)(receivedBytes / DemoBytesPerKilobyte), (unsigned long)(totalBytes / DemoBytesPerKilobyte)];
     }
-    if ([state isEqualToString:DemoUpdateStateInstalled]) return @"更新状态：新版本已安装，下次打开游戏生效";
-    if ([state isEqualToString:DemoUpdateStateUpToDate]) return @"更新状态：已是最新版本";
+    if ([state isEqualToString:CocosGameHotUpdateStateInstalled]) return @"更新状态：新版本已安装，下次打开游戏生效";
+    if ([state isEqualToString:CocosGameHotUpdateStateUpToDate]) return @"更新状态：已是最新版本";
     return state;
 }
 
-#pragma mark - CocosGameSDKDelegate
+#pragma mark - CocosGameHotUpdateDelegate
 
 /**
- * 更新进度：SDK 在主线程回调。
+ * 更新进度：热更新库在主线程回调。
  */
-- (void)gameSDKDidUpdateGame:(NSString *)gameId
-                       state:(NSString *)state
-               receivedBytes:(NSUInteger)receivedBytes
-                  totalBytes:(NSUInteger)totalBytes {
+- (void)gameHotUpdateDidUpdateGame:(NSString *)gameId
+                             state:(NSString *)state
+                     receivedBytes:(NSUInteger)receivedBytes
+                        totalBytes:(NSUInteger)totalBytes {
     NSLog(@"HotUpdateDemo 更新进度 gameId=%@, state=%@, %lu/%lu", gameId, state, (unsigned long)receivedBytes, (unsigned long)totalBytes);
     self.statusLabel.text = [self createProgressText:state receivedBytes:receivedBytes totalBytes:totalBytes];
 }
@@ -193,10 +192,12 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
 /**
  * 更新失败：不影响打开游戏，SDK 会继续使用已安装版本或内置版本。
  */
-- (void)gameSDKDidFailUpdateGame:(NSString *)gameId code:(NSInteger)code message:(NSString *)message {
+- (void)gameHotUpdateDidFailUpdateGame:(NSString *)gameId code:(NSInteger)code message:(NSString *)message {
     NSLog(@"HotUpdateDemo 更新失败 gameId=%@, code=%ld, message=%@", gameId, (long)code, message);
     self.statusLabel.text = [NSString stringWithFormat:@"更新失败（错误码 %ld）：%@", (long)code, message];
 }
+
+#pragma mark - CocosGameSDKDelegate
 
 /**
  * 牌桌返回箭头：关闭游戏。
