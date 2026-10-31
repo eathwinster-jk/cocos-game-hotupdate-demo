@@ -13,6 +13,9 @@
     <string name="module_version_builtin">模块版本：内置</string>
     <string name="open_game">打开游戏</string>
     <string name="close_game">关闭游戏</string>
+    <string name="clear_modules">清除热更新</string>
+    <string name="clear_modules_done">已清除热更新文件，下次打开游戏会重新下载</string>
+    <string name="clear_modules_busy">游戏打开中或正在下载，暂时不能清除</string>
     <string name="apply_hint">打开游戏前先检查并下载新版本，完成后加载游戏；网络失败时直接使用已安装版本或内置版本。</string>
     <string name="invalid_session">游客会话参数无效</string>
     <string name="session_invalid">会话已失效：%1$s</string>

@@ -1,4 +1,4 @@
-// 热更新 Demo 主页面：点击打开游戏时先检查并下载新版本、展示进度，完成后以游客身份把游戏内嵌在页面顶部，并在下方显示模块版本。
+// 热更新 Demo 主页面：点击打开游戏时先检查并下载新版本、展示进度，完成后以游客身份把游戏内嵌在页面顶部，并在下方显示模块版本；可清除已下载的模块后重新热更。
 package com.eath.cocosgamehotupdatedemo;
 
 import android.app.Activity;
@@ -34,6 +34,7 @@ public final class MainActivity extends Activity implements GameHostListener {
     private TextView versionView;
     private Button openButton;
     private Button closeButton;
+    private Button clearButton;
     private boolean isPreparingGame;
     private boolean isGameOpen;
 
@@ -112,8 +113,22 @@ public final class MainActivity extends Activity implements GameHostListener {
         panel.addView(openButton, createItemParams());
         closeButton = createButton(R.string.close_game, () -> CocosGameSDK.getInstance().closeGame());
         panel.addView(closeButton, createItemParams());
+        clearButton = createButton(R.string.clear_modules, this::clearInstalledModules);
+        panel.addView(clearButton, createItemParams());
         panel.addView(createText(getString(R.string.apply_hint), 13), createItemParams());
         return panel;
+    }
+
+    /** 清除已下载的模块，下次打开游戏会回到内置版本并重新下载。 */
+    private void clearInstalledModules() {
+        if (!hotUpdate.clearInstalledModules(GAME_ID)) {
+            Toast.makeText(this, R.string.clear_modules_busy, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        statusView.setText(R.string.update_idle);
+        progressBar.setProgress(0);
+        updateVersionText();
+        Toast.makeText(this, R.string.clear_modules_done, Toast.LENGTH_SHORT).show();
     }
 
     /** 先检查并下载新版本，结束（已安装、已是最新或失败）后再打开游戏。 */
@@ -163,6 +178,7 @@ public final class MainActivity extends Activity implements GameHostListener {
     private void updateGameButtons() {
         openButton.setEnabled(!isGameOpen && !isPreparingGame);
         closeButton.setEnabled(isGameOpen);
+        clearButton.setEnabled(!isGameOpen && !isPreparingGame);
     }
 
     /** 把更新状态转换为页面文案。 */

@@ -24,11 +24,11 @@
 
 | 平台 | 热更新库 |
 | --- | --- |
-| Android | `com.eath.cocosgamesdk:game-sdk-hotupdate:0.3.1`（自动带上同版本 `game-sdk`） |
-| iOS SPM | `https://github.com/eathwinster-jk/cocos-game-ios-sdk` 0.3.1，勾选 `CocosGameHotUpdate` 产品（已包含 `CocosGameSDK`） |
-| iOS CocoaPods | `pod 'CocosGameHotUpdate', :podspec => 'https://raw.githubusercontent.com/eathwinster-jk/cocos-game-ios-sdk/0.3.1/CocosGameHotUpdate.podspec'`，同时保留 `CocosGameSDK` 的 pod |
+| Android | `com.eath.cocosgamesdk:game-sdk-hotupdate:0.3.2`（自动带上同版本 `game-sdk`） |
+| iOS SPM | `https://github.com/eathwinster-jk/cocos-game-ios-sdk` 0.3.2，勾选 `CocosGameHotUpdate` 产品（已包含 `CocosGameSDK`） |
+| iOS CocoaPods | `pod 'CocosGameHotUpdate', :podspec => 'https://raw.githubusercontent.com/eathwinster-jk/cocos-game-ios-sdk/0.3.2/CocosGameHotUpdate.podspec'`，同时保留 `CocosGameSDK` 的 pod |
 
-热更新库与游戏 SDK 的版本必须一致。查询已安装版本的接口从 0.3.1 起提供。
+热更新库与游戏 SDK 的版本必须一致。查询已安装版本的接口从 0.3.1 起提供；清除、取消接口与失败重试从 0.3.2 起提供。
 
 游戏模块依赖 SDK 内置的主包脚本，**只适用于构建它的那个 SDK 版本**。宿主升级 SDK 后，SDK 只会安装为新 SDK 版本发布的模块；在游戏方发布之前，使用新 SDK 内置的模块。
 
@@ -72,6 +72,13 @@ hotUpdate.checkForUpdate("niuniu");
 
 // 查询下次打开会使用的模块版本，0 表示 SDK 内置模块
 int version = hotUpdate.getInstalledVersion("niuniu");
+
+// 0.3.2 起：取消进行中的检查或下载（结束时回调错误码 5）
+hotUpdate.cancelUpdate("niuniu");
+
+// 0.3.2 起：关闭游戏后清除已下载的模块，下次打开回到内置模块并重新下载；
+// 游戏打开中或正在下载时返回 false
+boolean isCleared = hotUpdate.clearInstalledModules("niuniu");
 ```
 
 页面销毁时调用 `setUpdateListener(null)`，避免监听器持有已销毁的页面。状态和错误码常量见 `GameHotUpdate.STATE_*`、`GameHotUpdate.ERROR_*`。
@@ -92,6 +99,12 @@ self.hotUpdate.delegate = self;
 
 // 查询下次打开会使用的模块版本，0 表示 SDK 内置模块
 NSInteger version = [self.hotUpdate installedVersionForGameId:@"niuniu"];
+
+// 0.3.2 起：取消进行中的检查或下载（结束时回调错误码 5）
+[self.hotUpdate cancelUpdateWithGameId:@"niuniu"];
+
+// 0.3.2 起：关闭游戏后清除已下载的模块，游戏打开中或正在下载时返回 NO
+BOOL isCleared = [self.hotUpdate clearInstalledModulesForGameId:@"niuniu"];
 ```
 
 更新进度通过 `CocosGameHotUpdateDelegate` 的可选方法回调，均在主线程：
@@ -126,10 +139,12 @@ NSInteger version = [self.hotUpdate installedVersionForGameId:@"niuniu"];
 
 | code | 含义 |
 | --- | --- |
-| 1 | 网络错误：清单或模块包下载失败、HTTP 状态码非 200 |
+| 1 | 网络错误：清单或模块包下载失败、HTTP 状态码非 200（已自动重试后仍失败） |
 | 2 | 版本清单格式错误 |
 | 3 | 模块包校验失败：大小或 SHA-256 与清单不一致 |
-| 4 | 安装失败：解压、写入或磁盘空间问题 |
+| 4 | 安装失败：解压或写入失败 |
+| 5 | 已取消：宿主调用了取消接口（0.3.2 起） |
+| 6 | 存储空间不足：可用空间小于模块包大小的 4 倍（0.3.2 起） |
 
 **更新失败不会影响打开游戏**，SDK 会继续使用已安装的版本或内置版本。宿主一般只需要记录日志，不需要提示用户。
 
@@ -139,10 +154,11 @@ NSInteger version = [self.hotUpdate installedVersionForGameId:@"niuniu"];
 - 想让首次打开就用上新版本：先调用 `checkForUpdate`，在回调 `installed`、`upToDate` 或失败后再打开游戏（Demo 即为此做法）。下载期间可以用 `downloading` 回调的字节数显示进度。网络慢时会延后打开游戏，宿主可按需设置等待上限，超时直接打开。
 - 热更新只需开启一次，重复开启以最后一次为准。
 - 同一个游戏同时只会有一个下载任务，重复调用会被忽略。
-- 模块存放位置由 SDK 管理，宿主不要清理或修改：
+- 模块存放位置由 SDK 管理，宿主不要直接删除或修改，需要清理时调用清除接口：
   - Android：`Context.getFilesDir()/cocos_game_modules/`
   - iOS：`Documents/cocos_game_modules/`（已排除 iCloud 备份）
-- 宿主如果在清理缓存时删除了上述目录，SDK 会退回内置模块，下次打开游戏时重新下载。
+- 清除接口会同时清掉坏版本记录，适合"清理缓存"或排查问题后重新热更；必须在关闭游戏后调用。
+- 宿主如果在清理缓存时直接删除了上述目录，SDK 会退回内置模块，下次打开游戏时重新下载。
 
 ## 4. 安全与容错机制
 
@@ -153,6 +169,9 @@ NSInteger version = [self.hotUpdate installedVersionForGameId:@"niuniu"];
 | 大小限制 | 单个模块包不超过 64 MB |
 | 安全解压 | 拒绝写到模块目录以外的路径 |
 | 原子安装 | 先解压到临时目录，校验通过后再切换为正式版本，中途失败不影响已安装版本 |
+| 失败重试 | 连接失败、读取中断、HTTP 5xx / 408 / 429 自动重试 3 次，间隔 1、2、4 秒；其他状态码和校验失败不重试（0.3.2 起） |
+| 临时文件清理 | 每次更新开始前删除上次中断（杀进程、断电）留下的临时目录和压缩包（0.3.2 起） |
+| 空间检查 | 下载前确认可用空间不少于模块包大小的 4 倍，不足时不下载（0.3.2 起） |
 | 加载失败回退 | 新版本加载失败时，本次立即改用内置模块，并把该版本标记为坏版本，以后不再安装 |
 | 启动确认 | 新版本连续 2 次打开都没有成功进入游戏，自动标记为坏版本，退回内置模块 |
 | SDK 升级重置 | SDK 版本变化后，旧版本的模块和坏版本记录全部失效 |
@@ -167,9 +186,9 @@ NSInteger version = [self.hotUpdate installedVersionForGameId:@"niuniu"];
   "modules": [
     {
       "gameId": "niuniu",
-      "sdkVersion": "0.3.1",
+      "sdkVersion": "0.3.2",
       "version": 3,
-      "url": "niuniu/0.3.1/3.zip",
+      "url": "niuniu/0.3.2/3.zip",
       "sha256": "17a2bbd6b8e41aec6b1e839db1d0825c2e553656667f412da6dd4d585aca28ff",
       "size": 1818830
     }
@@ -230,7 +249,7 @@ cd android
 ./gradlew :app:installDebug
 ```
 
-- SDK 版本默认 0.3.1，可用 `-PgameSdkVersion=x.y.z` 指定（不低于 0.3.1）。
+- SDK 版本默认 0.3.2，可用 `-PgameSdkVersion=x.y.z` 指定（不低于 0.3.2）。
 - 版本清单地址在 `app/build.gradle.kts` 的 `MODULE_CATALOG_URL`。
 - 日志过滤：`adb logcat -s HotUpdateDemo GameModuleUpdater GameModuleStore`
 
@@ -247,6 +266,7 @@ cd android
 1. 首次安装后，下方显示“模块版本：内置”，游戏区为空。
 2. 点“打开游戏”：状态依次显示“检查中”“下载中 x / y KB”和进度条，下载完成后加载牌桌，下方显示“模块版本：vN（热更新）”。
 3. 点“关闭游戏”再打开：状态显示“已是最新版本”，直接加载同一版本。
+4. Android：关闭游戏后点“清除热更新”，下方变为“模块版本：内置”；再点“打开游戏”会重新下载并加载新版本。游戏打开或下载中该按钮不可用。
 
 ## 8. 常见问题
 
