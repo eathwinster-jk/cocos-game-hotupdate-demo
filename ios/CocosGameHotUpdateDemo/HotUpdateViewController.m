@@ -33,7 +33,8 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
     CocosGameSDK.shared.delegate = self;
-    self.hotUpdate = [CocosGameHotUpdate installWithCatalogURL:[NSURL URLWithString:DemoModuleCatalogURL]];
+    self.hotUpdate = [CocosGameHotUpdate installWithCatalogURL:[NSURL URLWithString:DemoModuleCatalogURL]
+                                              catalogPublicKey:DemoModuleCatalogPublicKey];
     self.hotUpdate.delegate = self;
     [self buildInterface];
     [self updateVersionLabel];
@@ -248,6 +249,13 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
     NSLog(@"HotUpdateDemo 更新失败 gameId=%@, code=%ld, message=%@", gameId, (long)code, message);
     self.statusLabel.text = [NSString stringWithFormat:@"更新失败（错误码 %ld）：%@", (long)code, message];
     [self finishPreparingGame];
+}
+
+/**
+ * 埋点事件：Demo 只打印日志，宿主可上报到自己的统计平台。
+ */
+- (void)gameHotUpdateDidRecordEvent:(CocosGameHotUpdateEvent *)event {
+    NSLog(@"HotUpdateDemo 埋点 %@", event);
 }
 
 #pragma mark - CocosGameSDKDelegate

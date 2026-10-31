@@ -19,6 +19,7 @@ import com.eath.cocosgamesdk.CocosGameSDK;
 import com.eath.cocosgamesdk.GameHostListener;
 import com.eath.cocosgamesdk.GameSessionConfig;
 import com.eath.cocosgamesdk.hotupdate.GameHotUpdate;
+import com.eath.cocosgamesdk.hotupdate.GameUpdateEvent;
 import com.eath.cocosgamesdk.hotupdate.GameUpdateListener;
 
 public final class MainActivity extends Activity implements GameHostListener {
@@ -57,6 +58,12 @@ public final class MainActivity extends Activity implements GameHostListener {
             statusView.setText(getString(R.string.update_failed, code, message));
             finishPreparingGame();
         }
+
+        /** 埋点事件：Demo 只打印日志，宿主可上报到自己的统计平台。 */
+        @Override
+        public void onUpdateEvent(GameUpdateEvent event) {
+            Log.i(LOG_TAG, "埋点 " + event);
+        }
     };
 
     /** 初始化 SDK，用 Demo 专用清单开启热更新（须在打开游戏前），并创建页面。 */
@@ -64,7 +71,7 @@ public final class MainActivity extends Activity implements GameHostListener {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         CocosGameSDK.getInstance().initialize(this);
-        hotUpdate = GameHotUpdate.install(this, BuildConfig.MODULE_CATALOG_URL);
+        hotUpdate = GameHotUpdate.install(this, BuildConfig.MODULE_CATALOG_URL, BuildConfig.MODULE_CATALOG_PUBLIC_KEY);
         hotUpdate.setUpdateListener(updateListener);
         CocosGameSDK.getInstance().setHostListener(this);
         setContentView(createContentView());

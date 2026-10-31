@@ -15,6 +15,11 @@ android {
         versionName = "1.0.0"
         // Demo 专用版本清单，与正式宿主使用的清单互相独立。
         buildConfigField("String", "MODULE_CATALOG_URL", "\"https://cocos-game-modules.pages.dev/demo/android/catalog.json\"")
+        // 清单签名公钥（可公开），SDK 用它校验 catalog.json.sig；可用 -PmoduleCatalogPublicKey=... 覆盖
+        val moduleCatalogPublicKey = providers.gradleProperty("moduleCatalogPublicKey")
+            .orElse("MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAErTdV8F92qHswr8ysK3qdPAlCSlOGceiYNZu02CJbHkGYFCbrUg/+TNJDPQNt+nSyS6oM9KIkh7o3+t2DcsyQuA==")
+            .get()
+        buildConfigField("String", "MODULE_CATALOG_PUBLIC_KEY", "\"$moduleCatalogPublicKey\"")
         buildConfigField("String", "GAME_WS_URL", "\"wss://test.imnono.net/game-ws/ws\"")
         buildConfigField("String", "GAME_API_URL", "\"https://test.imnono.net/game-lobby\"")
         buildConfigField("String", "GAME_GUEST_SCENE_ID", "\"3947124\"")
@@ -36,7 +41,7 @@ android {
 dependencies {
     // 热更新模块按 SDK 版本精确匹配，升级 SDK 后需要发布对应版本的模块。
     val gameSdkVersion = providers.gradleProperty("gameSdkVersion")
-        .orElse("0.3.2")
+        .orElse("0.5.0")
         .get()
     // 热更新库会自动带上同版本的 game-sdk。
     implementation("com.eath.cocosgamesdk:game-sdk-hotupdate:$gameSdkVersion")
