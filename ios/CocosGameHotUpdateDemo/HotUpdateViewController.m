@@ -1,4 +1,4 @@
-// 热更新 Demo 主页面：检查更新、展示更新进度，并把游戏以游客身份内嵌在页面顶部。
+// 热更新 Demo 主页面：点击打开游戏时先检查并下载新版本、展示进度，完成后以游客身份把游戏内嵌在页面顶部，并在下方显示模块版本。
 #import "HotUpdateViewController.h"
 
 #import <CocosGameHotUpdate/CocosGameHotUpdate.h>
@@ -13,10 +13,14 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
 
 @property(nonatomic, strong) CocosGameHotUpdate *hotUpdate;
 @property(nonatomic, strong) UIView *gameContainer;
+@property(nonatomic, strong) UILabel *placeholderLabel;
 @property(nonatomic, strong) UILabel *statusLabel;
+@property(nonatomic, strong) UIProgressView *progressView;
+@property(nonatomic, strong) UILabel *versionLabel;
 @property(nonatomic, strong) UILabel *messageLabel;
 @property(nonatomic, strong) UIButton *openButton;
 @property(nonatomic, strong) UIButton *closeButton;
+@property(nonatomic, assign) BOOL isPreparingGame;
 
 @end
 
@@ -32,6 +36,7 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
     self.hotUpdate = [CocosGameHotUpdate installWithCatalogURL:[NSURL URLWithString:DemoModuleCatalogURL]];
     self.hotUpdate.delegate = self;
     [self buildInterface];
+    [self updateVersionLabel];
     [self updateGameButtons:NO];
 }
 
@@ -46,10 +51,7 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
  * 创建游戏容器与操作区。
  */
 - (void)buildInterface {
-    self.gameContainer = [[UIView alloc] init];
-    self.gameContainer.backgroundColor = UIColor.blackColor;
-    self.gameContainer.clipsToBounds = YES;
-    self.gameContainer.translatesAutoresizingMaskIntoConstraints = NO;
+    self.gameContainer = [self createGameContainer];
     UIStackView *stack = [self createControlStack];
     [self.view addSubview:self.gameContainer];
     [self.view addSubview:stack];
@@ -66,7 +68,26 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
 }
 
 /**
- * 创建标题、清单地址、更新状态、操作按钮与说明。
+ * 创建游戏容器；未打开游戏时显示提示，游戏视图打开后覆盖在提示之上。
+ */
+- (UIView *)createGameContainer {
+    UIView *container = [[UIView alloc] init];
+    container.backgroundColor = UIColor.blackColor;
+    container.clipsToBounds = YES;
+    container.translatesAutoresizingMaskIntoConstraints = NO;
+    self.placeholderLabel = [self createLabel:@"点击「打开游戏」加载" size:15 color:UIColor.lightGrayColor];
+    self.placeholderLabel.textAlignment = NSTextAlignmentCenter;
+    self.placeholderLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:self.placeholderLabel];
+    [NSLayoutConstraint activateConstraints:@[
+        [self.placeholderLabel.centerXAnchor constraintEqualToAnchor:container.centerXAnchor],
+        [self.placeholderLabel.centerYAnchor constraintEqualToAnchor:container.centerYAnchor],
+    ]];
+    return container;
+}
+
+/**
+ * 创建标题、清单地址、更新状态、进度条、模块版本、操作按钮与说明。
  */
 - (UIStackView *)createControlStack {
     UIStackView *stack = [[UIStackView alloc] init];
@@ -77,12 +98,15 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
     [stack addArrangedSubview:[self createLabel:[@"版本清单：" stringByAppendingString:DemoModuleCatalogURL] size:12 color:UIColor.secondaryLabelColor]];
     self.statusLabel = [self createLabel:@"更新状态：未检查" size:16 color:UIColor.labelColor];
     [stack addArrangedSubview:self.statusLabel];
-    [stack addArrangedSubview:[self createButton:@"检查更新" action:@selector(checkUpdate)]];
-    self.openButton = [self createButton:@"游客打开游戏" action:@selector(openGuestGame)];
+    self.progressView = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
+    [stack addArrangedSubview:self.progressView];
+    self.versionLabel = [self createLabel:@"" size:16 color:UIColor.labelColor];
+    [stack addArrangedSubview:self.versionLabel];
+    self.openButton = [self createButton:@"打开游戏" action:@selector(prepareAndOpenGame)];
     [stack addArrangedSubview:self.openButton];
     self.closeButton = [self createButton:@"关闭游戏" action:@selector(closeGame)];
     [stack addArrangedSubview:self.closeButton];
-    [stack addArrangedSubview:[self createLabel:@"打开游戏时使用已安装的最新版本，并在后台检查新版本；下载完成的新版本在下次打开游戏时生效。"
+    [stack addArrangedSubview:[self createLabel:@"打开游戏前先检查并下载新版本，完成后加载游戏；网络失败时直接使用已安装版本或内置版本。"
                                            size:13 color:UIColor.secondaryLabelColor]];
     self.messageLabel = [self createLabel:@"" size:13 color:UIColor.systemRedColor];
     [stack addArrangedSubview:self.messageLabel];
@@ -117,24 +141,46 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
 }
 
 /**
- * 根据游戏是否打开切换按钮可用状态。
+ * 根据游戏是否打开（或正在准备）切换按钮可用状态。
  */
 - (void)updateGameButtons:(BOOL)isGameOpen {
-    self.openButton.enabled = !isGameOpen;
-    self.openButton.alpha = isGameOpen ? 0.5 : 1;
+    BOOL canOpen = !isGameOpen && !self.isPreparingGame;
+    self.openButton.enabled = canOpen;
+    self.openButton.alpha = canOpen ? 1 : 0.5;
     self.closeButton.enabled = isGameOpen;
     self.closeButton.alpha = isGameOpen ? 1 : 0.5;
 }
 
 /**
- * 预先检查并下载新版本，下次打开游戏生效。
+ * 显示下次打开会加载的模块版本。
  */
-- (void)checkUpdate {
+- (void)updateVersionLabel {
+    NSInteger version = [self.hotUpdate installedVersionForGameId:DemoGameId];
+    self.versionLabel.text = version > 0 ? [NSString stringWithFormat:@"模块版本：v%ld（热更新）", (long)version] : @"模块版本：内置";
+}
+
+/**
+ * 先检查并下载新版本，结束（已安装、已是最新或失败）后再打开游戏。
+ */
+- (void)prepareAndOpenGame {
+    self.isPreparingGame = YES;
+    self.messageLabel.text = @"";
+    self.progressView.progress = 0;
+    [self updateGameButtons:NO];
     [self.hotUpdate checkForUpdateWithGameId:DemoGameId];
 }
 
 /**
- * 以游客身份打开直播间牌桌；SDK 使用已安装的最新模块，并在后台检查新版本。
+ * 下载流程结束后打开游戏；只响应本页面发起的那一次准备。
+ */
+- (void)finishPreparingGame {
+    if (!self.isPreparingGame) return;
+    self.isPreparingGame = NO;
+    [self openGuestGame];
+}
+
+/**
+ * 以游客身份打开直播间牌桌，使用刚刚安装的最新模块。
  */
 - (void)openGuestGame {
     NSError *error = nil;
@@ -146,16 +192,17 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
                     clientVersion:version deviceType:@"iOS" error:&error];
     if (!session) {
         self.messageLabel.text = error.localizedDescription;
+        [self updateGameButtons:NO];
         return;
     }
-    self.messageLabel.text = @"";
+    [self updateVersionLabel];
     [self.view layoutIfNeeded];
     [[CocosGameSDK shared] openGame:DemoGameId sessionConfig:session inContainer:self.gameContainer fromViewController:self];
     [self updateGameButtons:YES];
 }
 
 /**
- * 关闭游戏，再次打开时会使用期间安装的新版本。
+ * 关闭游戏，回到空白游戏区。
  */
 - (void)closeGame {
     [[CocosGameSDK shared] close];
@@ -171,7 +218,7 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
         return [NSString stringWithFormat:@"更新状态：下载中 %lu / %lu KB",
             (unsigned long)(receivedBytes / DemoBytesPerKilobyte), (unsigned long)(totalBytes / DemoBytesPerKilobyte)];
     }
-    if ([state isEqualToString:CocosGameHotUpdateStateInstalled]) return @"更新状态：新版本已安装，下次打开游戏生效";
+    if ([state isEqualToString:CocosGameHotUpdateStateInstalled]) return @"更新状态：新版本已安装";
     if ([state isEqualToString:CocosGameHotUpdateStateUpToDate]) return @"更新状态：已是最新版本";
     return state;
 }
@@ -179,7 +226,7 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
 #pragma mark - CocosGameHotUpdateDelegate
 
 /**
- * 更新进度：热更新库在主线程回调。
+ * 更新进度：热更新库在主线程回调；已安装或已是最新时结束准备并打开游戏。
  */
 - (void)gameHotUpdateDidUpdateGame:(NSString *)gameId
                              state:(NSString *)state
@@ -187,14 +234,20 @@ static const NSUInteger DemoBytesPerKilobyte = 1024;
                         totalBytes:(NSUInteger)totalBytes {
     NSLog(@"HotUpdateDemo 更新进度 gameId=%@, state=%@, %lu/%lu", gameId, state, (unsigned long)receivedBytes, (unsigned long)totalBytes);
     self.statusLabel.text = [self createProgressText:state receivedBytes:receivedBytes totalBytes:totalBytes];
+    if (totalBytes > 0) self.progressView.progress = (float)receivedBytes / (float)totalBytes;
+    if ([state isEqualToString:CocosGameHotUpdateStateInstalled] || [state isEqualToString:CocosGameHotUpdateStateUpToDate]) {
+        self.progressView.progress = 1;
+        [self finishPreparingGame];
+    }
 }
 
 /**
- * 更新失败：不影响打开游戏，SDK 会继续使用已安装版本或内置版本。
+ * 更新失败：不影响打开游戏，继续使用已安装版本或内置版本。
  */
 - (void)gameHotUpdateDidFailUpdateGame:(NSString *)gameId code:(NSInteger)code message:(NSString *)message {
     NSLog(@"HotUpdateDemo 更新失败 gameId=%@, code=%ld, message=%@", gameId, (long)code, message);
     self.statusLabel.text = [NSString stringWithFormat:@"更新失败（错误码 %ld）：%@", (long)code, message];
+    [self finishPreparingGame];
 }
 
 #pragma mark - CocosGameSDKDelegate

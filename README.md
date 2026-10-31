@@ -14,6 +14,7 @@
 1. 宿主打开游戏时，SDK 使用本机已安装的最新模块；没有安装过就使用 SDK 内置的模块。
 2. 同时在后台拉取版本清单，有新版本就下载、校验并安装。
 3. 新版本在**下次打开游戏**时生效，不会打断当前正在玩的游戏。
+4. 宿主也可以在打开游戏前先检查并下载（见 3.4），下载完成后再打开，首次打开就使用新版本。
 
 适用平台：Android、iOS。H5 SDK 每次都从网页加载最新资源，不需要热更新。
 
@@ -23,11 +24,11 @@
 
 | 平台 | 热更新库 |
 | --- | --- |
-| Android | `com.eath.cocosgamesdk:game-sdk-hotupdate:0.3.0`（自动带上同版本 `game-sdk`） |
-| iOS SPM | `https://github.com/eathwinster-jk/cocos-game-ios-sdk` 0.3.0，勾选 `CocosGameHotUpdate` 产品（已包含 `CocosGameSDK`） |
-| iOS CocoaPods | `pod 'CocosGameHotUpdate', :podspec => 'https://raw.githubusercontent.com/eathwinster-jk/cocos-game-ios-sdk/0.3.0/CocosGameHotUpdate.podspec'`，同时保留 `CocosGameSDK` 的 pod |
+| Android | `com.eath.cocosgamesdk:game-sdk-hotupdate:0.3.1`（自动带上同版本 `game-sdk`） |
+| iOS SPM | `https://github.com/eathwinster-jk/cocos-game-ios-sdk` 0.3.1，勾选 `CocosGameHotUpdate` 产品（已包含 `CocosGameSDK`） |
+| iOS CocoaPods | `pod 'CocosGameHotUpdate', :podspec => 'https://raw.githubusercontent.com/eathwinster-jk/cocos-game-ios-sdk/0.3.1/CocosGameHotUpdate.podspec'`，同时保留 `CocosGameSDK` 的 pod |
 
-热更新库与游戏 SDK 的版本必须一致。
+热更新库与游戏 SDK 的版本必须一致。查询已安装版本的接口从 0.3.1 起提供。
 
 游戏模块依赖 SDK 内置的主包脚本，**只适用于构建它的那个 SDK 版本**。宿主升级 SDK 后，SDK 只会安装为新 SDK 版本发布的模块；在游戏方发布之前，使用新 SDK 内置的模块。
 
@@ -68,6 +69,9 @@ hotUpdate.setUpdateListener(new GameUpdateListener() {
 
 // 可选：在打开游戏之前预先下载，例如进入直播间时
 hotUpdate.checkForUpdate("niuniu");
+
+// 查询下次打开会使用的模块版本，0 表示 SDK 内置模块
+int version = hotUpdate.getInstalledVersion("niuniu");
 ```
 
 页面销毁时调用 `setUpdateListener(null)`，避免监听器持有已销毁的页面。状态和错误码常量见 `GameHotUpdate.STATE_*`、`GameHotUpdate.ERROR_*`。
@@ -85,6 +89,9 @@ self.hotUpdate.delegate = self;
 
 // 可选：在打开游戏之前预先下载
 [self.hotUpdate checkForUpdateWithGameId:@"niuniu"];
+
+// 查询下次打开会使用的模块版本，0 表示 SDK 内置模块
+NSInteger version = [self.hotUpdate installedVersionForGameId:@"niuniu"];
 ```
 
 更新进度通过 `CocosGameHotUpdateDelegate` 的可选方法回调，均在主线程：
@@ -129,6 +136,7 @@ self.hotUpdate.delegate = self;
 ### 3.4 宿主需要注意的事项
 
 - 开启热更新要在打开游戏之前；打开游戏时会自动检查更新，`checkForUpdate` 只是提前下载，不调用也可以。
+- 想让首次打开就用上新版本：先调用 `checkForUpdate`，在回调 `installed`、`upToDate` 或失败后再打开游戏（Demo 即为此做法）。下载期间可以用 `downloading` 回调的字节数显示进度。网络慢时会延后打开游戏，宿主可按需设置等待上限，超时直接打开。
 - 热更新只需开启一次，重复开启以最后一次为准。
 - 同一个游戏同时只会有一个下载任务，重复调用会被忽略。
 - 模块存放位置由 SDK 管理，宿主不要清理或修改：
@@ -159,9 +167,9 @@ self.hotUpdate.delegate = self;
   "modules": [
     {
       "gameId": "niuniu",
-      "sdkVersion": "0.3.0",
+      "sdkVersion": "0.3.1",
       "version": 3,
-      "url": "niuniu/0.3.0/3.zip",
+      "url": "niuniu/0.3.1/3.zip",
       "sha256": "17a2bbd6b8e41aec6b1e839db1d0825c2e553656667f412da6dd4d585aca28ff",
       "size": 1818830
     }
@@ -211,7 +219,7 @@ self.hotUpdate.delegate = self;
 
 ## 7. 运行 Demo
 
-两个 Demo 都使用测试环境的游客会话打开牛牛，界面上有“检查更新”“游客打开游戏”两个按钮，以及当前的更新状态。
+两个 Demo 都使用测试环境的游客会话，把牛牛牌桌嵌在页面顶部。启动时游戏区为空；点“打开游戏”后先检查并下载新版本，下方显示进度，完成后加载游戏，并在下方显示当前加载的模块版本。
 
 ### 7.1 Android
 
@@ -222,7 +230,7 @@ cd android
 ./gradlew :app:installDebug
 ```
 
-- SDK 版本默认 0.3.0，可用 `-PgameSdkVersion=x.y.z` 指定（不低于 0.3.0）。
+- SDK 版本默认 0.3.1，可用 `-PgameSdkVersion=x.y.z` 指定（不低于 0.3.1）。
 - 版本清单地址在 `app/build.gradle.kts` 的 `MODULE_CATALOG_URL`。
 - 日志过滤：`adb logcat -s HotUpdateDemo GameModuleUpdater GameModuleStore`
 
@@ -236,9 +244,9 @@ cd android
 
 ### 7.3 验证步骤
 
-1. 首次安装后点“游客打开游戏”：使用内置模块，后台下载新版本，状态显示“新版本已安装，下次打开游戏生效”。
-2. 关闭游戏，再次打开：牌桌顶部的倒计时文字前出现“热更新vN”字样，说明新模块已生效。
-3. 再点“检查更新”：显示“已是最新版本”。
+1. 首次安装后，下方显示“模块版本：内置”，游戏区为空。
+2. 点“打开游戏”：状态依次显示“检查中”“下载中 x / y KB”和进度条，下载完成后加载牌桌，下方显示“模块版本：vN（热更新）”。
+3. 点“关闭游戏”再打开：状态显示“已是最新版本”，直接加载同一版本。
 
 ## 8. 常见问题
 
